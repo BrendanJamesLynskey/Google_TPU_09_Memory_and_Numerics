@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google TPUs 09 &mdash; Memory Hierarchy &amp; Numerics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-primary:#0a0a0a; --bg-card:#0d1117; --bg-code:#161b22; --text-primary:#e6edf3; --text-secondary:#8b949e; --accent:#4285F4; --accent-dim:#4285F444; --accent-glow:#4285F433; --accent-2:#EA4335; --accent-3:#FBBC04; --accent-4:#34A853; --border:#21262d; --font-display:'Space Grotesk',sans-serif; --font-mono:'JetBrains Mono','Fira Code',monospace; --font-body:'Inter',sans-serif; --max-width:900px; }
+        *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+        html { scroll-behavior:smooth; }
+        body { background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-body); font-size:17px; line-height:1.7; overflow-x:hidden; }
+        .hero { min-height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:2rem 1.5rem; text-align:center; position:relative; }
+        .hero::before { content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:700px; height:600px; background:radial-gradient(circle,var(--accent-glow) 0%,transparent 70%); pointer-events:none; z-index:0; }
+        .hero > * { position:relative; z-index:1; }
+        .series-label { font-family:var(--font-mono); font-size:0.85rem; color:var(--accent); letter-spacing:0.15em; text-transform:uppercase; margin-bottom:1rem; }
+        .hero h1 { font-family:var(--font-display); font-size:clamp(2rem,5vw,3.2rem); font-weight:700; line-height:1.2; margin-bottom:1rem; }
+        .hero h1 .accent { color:var(--accent); }
+        .hero .subtitle { font-size:1.1rem; color:var(--text-secondary); max-width:640px; margin-bottom:2rem; }
+        .tags { display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:center; margin-bottom:2.5rem; }
+        .tag { font-family:var(--font-mono); font-size:0.75rem; padding:0.25rem 0.75rem; border-radius:999px; border:1px solid var(--accent); color:var(--accent); background:var(--accent-dim); }
+        .pipeline { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:0.25rem; margin-bottom:1rem; max-width:var(--max-width); }
+        .pipeline-step { font-family:var(--font-mono); font-size:0.7rem; padding:0.3rem 0.7rem; background:var(--bg-card); border:1px solid var(--border); border-radius:4px; color:var(--text-secondary); }
+        .pipeline-arrow { color:var(--accent); font-size:0.9rem; font-weight:700; }
+        .slide { min-height:100vh; max-width:var(--max-width); margin:0 auto; padding:4rem 1.5rem; position:relative; display:flex; flex-direction:column; justify-content:center; }
+        .slide-number { font-family:var(--font-display); font-size:5rem; font-weight:700; color:var(--accent-dim); position:absolute; top:2rem; right:1.5rem; line-height:1; }
+        .slide h2 { font-family:var(--font-display); font-size:1.9rem; font-weight:700; color:var(--accent); margin-bottom:1.5rem; line-height:1.25; }
+        .slide h3 { font-family:var(--font-display); font-size:1.3rem; font-weight:600; color:var(--text-primary); margin-top:1.5rem; margin-bottom:0.75rem; }
+        .slide p { margin-bottom:1rem; color:var(--text-secondary); }
+        .slide p strong { color:var(--text-primary); }
+        .slide ul, .slide ol { margin-bottom:1rem; padding-left:1.5rem; color:var(--text-secondary); }
+        .slide li { margin-bottom:0.4rem; }
+        .slide li strong { color:var(--text-primary); }
+        .table-wrap { overflow-x:auto; margin:1.25rem 0; border-radius:8px; border:1px solid var(--border); }
+        table { width:100%; border-collapse:collapse; font-size:0.9rem; }
+        th { background:var(--bg-code); color:var(--accent); font-weight:600; text-align:left; padding:0.75rem 1rem; border-bottom:1px solid var(--border); font-family:var(--font-display); white-space:nowrap; }
+        td { padding:0.6rem 1rem; border-bottom:1px solid var(--border); color:var(--text-secondary); vertical-align:top; }
+        tr:last-child td { border-bottom:none; }
+        tr:nth-child(even) td { background:rgba(13,17,23,0.5); }
+        .diagram-grid { display:grid; gap:0.75rem; margin:1.5rem 0; padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; }
+        .diagram-grid.cols-2 { grid-template-columns:1fr 1fr; }
+        .diagram-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+        .diagram-panel { padding:1rem; background:var(--bg-code); border:1px solid var(--border); border-radius:6px; }
+        .diagram-panel.accent-border { border-left:3px solid var(--accent); }
+        .diagram-panel.r { border-left:3px solid var(--accent-2); }
+        .diagram-panel.y { border-left:3px solid var(--accent-3); }
+        .diagram-panel.g { border-left:3px solid var(--accent-4); }
+        .diagram-panel h4 { font-family:var(--font-display); font-size:1rem; color:var(--accent); margin-bottom:0.5rem; }
+        .diagram-panel.r h4 { color:var(--accent-2); }
+        .diagram-panel.y h4 { color:var(--accent-3); }
+        .diagram-panel.g h4 { color:var(--accent-4); }
+        .diagram-panel p, .diagram-panel ul { font-size:0.9rem; }
+        .callout { background:var(--bg-card); border-left:3px solid var(--accent); border-radius:0 8px 8px 0; padding:1rem 1.25rem; margin:1.25rem 0; }
+        .callout p { margin-bottom:0; }
+        .callout .callout-label { font-family:var(--font-mono); font-size:0.75rem; color:var(--accent); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.3rem; }
+        .canvas-wrap { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; margin:1.25rem 0; overflow-x:auto; }
+        .canvas-wrap canvas, .canvas-wrap svg { display:block; margin:0 auto; max-width:100%; }
+        .tier-visual { display:flex; flex-direction:column; gap:0.5rem; margin:1.5rem 0; padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; }
+        .tier-bar { display:flex; align-items:center; gap:0.75rem; }
+        .tier-label { font-family:var(--font-mono); font-size:0.75rem; color:var(--text-secondary); min-width:90px; text-align:right; }
+        .tier-fill { height:32px; border-radius:4px; display:flex; align-items:center; padding:0 0.75rem; font-family:var(--font-mono); font-size:0.7rem; white-space:nowrap; color:#0a0a0a; font-weight:600; }
+        .tier-cost { font-family:var(--font-mono); font-size:0.7rem; color:var(--text-secondary); min-width:80px; }
+        .bits { display:flex; gap:1px; margin:0.5rem 0; }
+        .bit { font-family:var(--font-mono); font-size:0.65rem; padding:0.2rem 0; min-width:18px; text-align:center; border-radius:2px; }
+        .bit.s { background:#EA4335; color:#fff; }
+        .bit.e { background:#FBBC04; color:#000; }
+        .bit.m { background:#4285F4; color:#fff; }
+        .contents-list { list-style:none; padding-left:0; counter-reset:contents; }
+        .contents-list li { counter-increment:contents; padding:0.6rem 0; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:1rem; }
+        .contents-list li:last-child { border-bottom:none; }
+        .contents-list li::before { content:counter(contents,decimal-leading-zero); font-family:var(--font-mono); font-size:0.85rem; color:var(--accent); min-width:2rem; }
+        .contents-list a { color:var(--text-primary); text-decoration:none; }
+        .contents-list a:hover { color:var(--accent); }
+        .footer { text-align:center; padding:3rem 1.5rem; color:var(--text-secondary); font-size:0.85rem; border-top:1px solid var(--border); max-width:var(--max-width); margin:0 auto; }
+        .footer a { color:var(--accent); text-decoration:none; }
+        @media (max-width:640px) { .slide { padding:3rem 1rem; min-height:auto; } .slide-number { font-size:3rem; top:1.5rem; right:1rem; } .slide h2 { font-size:1.5rem; } .diagram-grid.cols-2,.diagram-grid.cols-3 { grid-template-columns:1fr; } .hero h1 { font-size:1.8rem; } table { font-size:0.78rem; } }
+    </style>
+</head>
+<body>
+
+<header class="hero">
+    <div class="series-label">Google TPUs Series &mdash; Presentation 09</div>
+    <h1>Memory <span class="accent">Hierarchy</span> &amp; Numerics</h1>
+    <p class="subtitle">Registers &rarr; VMEM &rarr; CMEM &rarr; HBM &rarr; remote HBM via ICI. INT8 &rarr; bf16 &rarr; FP8. The two axes that determine every TPU's effective performance.</p>
+    <div class="tags">
+        <span class="tag">VMEM</span><span class="tag">CMEM</span>
+        <span class="tag">HBM2 / 2e / 3 / 3e</span>
+        <span class="tag">INT8</span><span class="tag">bf16</span><span class="tag">FP8</span>
+    </div>
+    <div class="pipeline">
+        <span class="pipeline-step">PE registers</span><span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Accumulator SRAM</span><span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">VMEM</span><span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">CMEM</span><span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">HBM</span><span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">remote HBM (ICI)</span>
+    </div>
+</header>
+
+<section class="slide" id="slide-00">
+    <div class="slide-number">00</div>
+    <h2>Topics We'll Cover</h2>
+    <ul class="contents-list">
+        <li><a href="#slide-01">The Six-Tier TPU Memory Hierarchy</a></li>
+        <li><a href="#slide-02">VMEM &mdash; Software-Managed Vector Memory</a></li>
+        <li><a href="#slide-03">CMEM &mdash; The First TPU Cache</a></li>
+        <li><a href="#slide-04">HBM Generations Across TPU Generations</a></li>
+        <li><a href="#slide-05">Remote HBM and the ICI Bandwidth Cliff</a></li>
+        <li><a href="#slide-06">INT8 &mdash; Where v1 Started</a></li>
+        <li><a href="#slide-07">bfloat16 &mdash; The Format That Won</a></li>
+        <li><a href="#slide-08">FP8 &mdash; OCP E4M3 / E5M2</a></li>
+        <li><a href="#slide-09">Accumulator Widths &amp; Numerical Stability</a></li>
+        <li><a href="#slide-10">The "Halve Precision, Double FLOPS" Pattern</a></li>
+        <li><a href="#slide-11">Why TPUs Have No FP4 (Yet)</a></li>
+        <li><a href="#slide-12">Cheat Sheet</a></li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-01">
+    <div class="slide-number">01</div>
+    <h2>The Six-Tier TPU Memory Hierarchy</h2>
+    <p>From smallest and fastest to largest and slowest. Numbers are roughly Ironwood-class.</p>
+
+    <div class="tier-visual">
+        <div class="tier-bar"><span class="tier-label">PE regs</span><div class="tier-fill" style="width:18%; background:#EA4335;">Per-PE registers (KiBs)</div><span class="tier-cost">~1 cycle</span></div>
+        <div class="tier-bar"><span class="tier-label">Accum</span><div class="tier-fill" style="width:25%; background:#FBBC04;">Accumulator SRAM (~MB)</div><span class="tier-cost">1&ndash;2 cycles</span></div>
+        <div class="tier-bar"><span class="tier-label">VMEM</span><div class="tier-fill" style="width:38%; background:#34A853;">VMEM scratchpad (16&ndash;64 MiB per TC)</div><span class="tier-cost">~5 cycles</span></div>
+        <div class="tier-bar"><span class="tier-label">CMEM</span><div class="tier-fill" style="width:50%; background:#4285F4;">CMEM cache (128 MiB+ shared)</div><span class="tier-cost">~20 cycles</span></div>
+        <div class="tier-bar"><span class="tier-label">HBM</span><div class="tier-fill" style="width:75%; background:#8b949e; color:#0a0a0a;">HBM3e — 192 GiB at 7.37 TB/s</div><span class="tier-cost">~250 ns</span></div>
+        <div class="tier-bar"><span class="tier-label">Remote</span><div class="tier-fill" style="width:100%; background:#21262d; color:#e6edf3;">Remote HBM via ICI (1.2 TB/s bidir)</div><span class="tier-cost">~2 &mu;s + tx</span></div>
+    </div>
+
+    <h3>The two boundaries that matter most</h3>
+    <ul>
+        <li><strong>VMEM &harr; HBM</strong> (a ~1000&times; bandwidth cliff). The compiler's tile-size choice is dominated by keeping the working set in VMEM &mdash; an HBM round-trip costs you orders of magnitude more.</li>
+        <li><strong>HBM &harr; remote-HBM via ICI</strong> (~6&times; bandwidth cliff and ~10,000&times; latency cliff). This is the boundary between single-chip-tractable problems and pod-scale-tractable problems.</li>
+    </ul>
+
+    <p>Everything else &mdash; PE registers, accumulator, CMEM &mdash; is plumbing. The two cliffs are where compiler intelligence matters.</p>
+</section>
+
+<section class="slide" id="slide-02">
+    <div class="slide-number">02</div>
+    <h2>VMEM &mdash; Software-Managed Vector Memory</h2>
+    <p>VMEM is the per-TensorCore software-managed scratchpad. Direct ancestor of v1's Unified Buffer; not a cache.</p>
+
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>What lives in VMEM</h4>
+            <ul>
+                <li>Activation tiles being fed into the MXU.</li>
+                <li>Output tiles drained from the MXU before writeback.</li>
+                <li>Working sets for vector-unit operations (softmax, layer-norm, residual adds).</li>
+                <li>Small operands the compiler can keep resident across multiple operations.</li>
+            </ul>
+        </div>
+        <div class="diagram-panel y">
+            <h4>What's not in VMEM</h4>
+            <ul>
+                <li>Weights &mdash; weights live in HBM and stream through the weight FIFO.</li>
+                <li>Anything the compiler can't fit. If a tile is too big, the compiler spills to HBM (or now CMEM).</li>
+                <li>No tags, no replacement policy. Every byte's residency is statically planned.</li>
+            </ul>
+        </div>
+    </div>
+
+    <h3>Capacities by generation</h3>
+    <ul>
+        <li>v2: 32 MiB per TensorCore.</li>
+        <li>v3: 32 MiB per TensorCore.</li>
+        <li>v4: ~32 MiB per TensorCore.</li>
+        <li>v5p: ~64 MiB per TensorCore (estimated; not officially confirmed).</li>
+        <li>Trillium / Ironwood: similar order of magnitude, with bigger CMEM in front.</li>
+    </ul>
+
+    <p>VMEM size has not grown as fast as HBM &mdash; SRAM density doesn't scale like DRAM, and area is precious. The compiler is expected to manage residency with finer tile sizes; CMEM picks up the rest.</p>
+
+    <div class="callout">
+        <div class="callout-label">The Pallas API view</div>
+        <p>If you write low-level TPU kernels in Pallas, VMEM is the main thing you allocate explicitly. <code>BlockSpec(block_shape=..., index_map=...)</code> tells the compiler exactly which HBM region to bring into VMEM for each pipeline step; <code>pltpu.emit_pipeline</code> handles the double-buffering. This is where the TPU's "software does the scheduling" philosophy is most visible at the application layer.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-03">
+    <div class="slide-number">03</div>
+    <h2>CMEM &mdash; The First TPU Cache</h2>
+    <p>CMEM is introduced with v4i (ISCA 2021) and persists through every later TPU. It is shared between the two TensorCores on a chip, sits between VMEM and HBM, and is the first TPU memory level with explicit cache-like semantics.</p>
+
+    <div class="diagram-grid cols-3">
+        <div class="diagram-panel accent-border">
+            <h4>What CMEM is</h4>
+            <ul>
+                <li>Roughly 128 MiB on-die SRAM (v4 / v4i specifics; later chips similar order).</li>
+                <li>Shared by both TensorCores on the chip.</li>
+                <li>XLA controls residency; behaves cache-like in that lookups can hit or miss.</li>
+                <li>HBM bandwidth amplifier &mdash; effective memory bandwidth roughly doubles for workloads with good locality.</li>
+            </ul>
+        </div>
+        <div class="diagram-panel y">
+            <h4>What CMEM is not</h4>
+            <ul>
+                <li>Not a fully transparent cache (no automatic LRU; XLA decides what stays).</li>
+                <li>Not coherent with anything off-chip.</li>
+                <li>Not a uniform replacement for HBM &mdash; capacity is small.</li>
+            </ul>
+        </div>
+        <div class="diagram-panel g">
+            <h4>What it buys at the workload level</h4>
+            <ul>
+                <li><strong>KV cache hits</strong> on long-context inference.</li>
+                <li><strong>Activation re-use</strong> for backprop in training.</li>
+                <li><strong>Fused-attention staging</strong> for FlashAttention-style kernels.</li>
+                <li><strong>Embedding-row caches</strong> for repeated lookups in the same sequence.</li>
+            </ul>
+        </div>
+    </div>
+
+    <p>Why CMEM and not "just bigger VMEM"? VMEM is per-TensorCore; CMEM is shared. Shared SRAM is more area-efficient when both cores reuse the same data (typical for attention's QKV tiles). Splitting the levels gives the compiler two knobs &mdash; tightly-pipelined VMEM tiles vs whole-step CMEM working sets.</p>
+
+    <div class="callout">
+        <div class="callout-label">The architectural trend</div>
+        <p>From v1's pure scratchpad model to v4's scratchpad-plus-cache, the TPU's memory hierarchy has gradually become more cache-like. NVIDIA went the other way at the same time &mdash; H100's TMA introduced more explicit DMA control, more scratchpad-like behaviour. <strong>The two architectures are converging on the same shape from opposite directions.</strong></p>
+    </div>
+</section>
+
+<section class="slide" id="slide-04">
+    <div class="slide-number">04</div>
+    <h2>HBM Generations Across TPU Generations</h2>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>TPU</th><th>HBM standard</th><th>Per-chip capacity</th><th>Per-chip bandwidth</th><th>Stacks</th></tr></thead>
+            <tbody>
+                <tr><td>v1 (2015)</td><td><em>none</em> (DDR3)</td><td>8 GiB DDR3</td><td>~34 GB/s</td><td>2× DDR3 channels</td></tr>
+                <tr><td>v2 (2017)</td><td>HBM</td><td>16 GiB</td><td>~600 GB/s</td><td>2 stacks</td></tr>
+                <tr><td>v3 (2018)</td><td>HBM2</td><td>32 GiB</td><td>~900 GB/s</td><td>2 stacks</td></tr>
+                <tr><td>v4 (2020)</td><td>HBM2</td><td>32 GiB</td><td>1.2 TB/s</td><td>2 stacks</td></tr>
+                <tr><td>v4i (2020)</td><td>HBM2</td><td>8 GiB</td><td>~614 GB/s</td><td>1 stack</td></tr>
+                <tr><td>v5e (2023)</td><td>HBM2e (likely)</td><td>16 GiB</td><td>819 GB/s</td><td>1&ndash;2 stacks</td></tr>
+                <tr><td>v5p (2023)</td><td>HBM3 (likely)</td><td>95 GiB</td><td>2.76 TB/s</td><td>6 stacks</td></tr>
+                <tr><td>Trillium (2024)</td><td>HBM3 (likely)</td><td>32 GiB</td><td>1.64 TB/s</td><td>2 stacks</td></tr>
+                <tr><td>Ironwood (2025)</td><td><strong>HBM3e</strong></td><td><strong>192 GiB</strong></td><td><strong>7.37 TB/s</strong></td><td>6&ndash;8 stacks</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>The bandwidth curve in one ratio</h3>
+    <p>From v1 (34 GB/s) to Ironwood (7.37 TB/s) is <strong>~217&times; bandwidth growth in a decade</strong> &mdash; vastly faster than Moore's law on transistor count. Most of the per-chip performance growth in TPUs has come from feeding the chip faster, not from making the chip do more arithmetic per cycle.</p>
+
+    <h3>The HBM stack mechanics</h3>
+    <ul>
+        <li>Each HBM stack is several DRAM dies stacked vertically (4-Hi, 8-Hi, now 12-Hi for HBM3e), connected by through-silicon vias (TSVs) to a logic base die.</li>
+        <li>The logic base die handles the wide PHY and ECC.</li>
+        <li>The stack sits next to the TPU die on the package, connected via a silicon interposer (CoWoS or equivalent) over thousands of micro-bumps.</li>
+        <li>Per-stack bandwidth doubled roughly every generation: HBM (128 GB/s) &rarr; HBM2 (256 GB/s) &rarr; HBM2e (~480 GB/s) &rarr; HBM3 (~820 GB/s) &rarr; HBM3e (~1.2 TB/s).</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-05">
+    <div class="slide-number">05</div>
+    <h2>Remote HBM and the ICI Bandwidth Cliff</h2>
+    <p>Below HBM in the hierarchy is "the HBM on a different chip in the same pod, reached via ICI". Critical for any matmul that exceeds one-chip capacity.</p>
+
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Path</th><th>Bandwidth</th><th>Latency</th></tr></thead>
+            <tbody>
+                <tr><td>Local HBM (Ironwood)</td><td>7.37 TB/s</td><td>~250 ns</td></tr>
+                <tr><td>Remote HBM via ICI (Ironwood)</td><td>1.2 TB/s bidir</td><td>~2 &mu;s + serialisation</td></tr>
+                <tr><td>Remote HBM via Jupiter DCN (Trillium multipod)</td><td>13 Pb/s pod bisection &rarr; per-link ~Tbps</td><td>~10&ndash;100 &mu;s</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>The compiler's job</h3>
+    <ul>
+        <li>Tile a big matmul so each tile fits in <em>local</em> HBM &times; VMEM bandwidth.</li>
+        <li>Schedule cross-chip all-reduces so they overlap with compute on the next tile.</li>
+        <li>For multipod jobs: schedule cross-pod traffic as bulk async transfers, not on the critical path of a step.</li>
+    </ul>
+
+    <p>This is the same job the GPU compiler stack does, with different cliffs (NVLink for nearby, InfiniBand for far). The cliffs are sharper on TPU because of the larger pod size and the fact that ICI is custom-silicon &mdash; sub-microsecond at small messages, but with a hard tier change to Jupiter at the pod boundary.</p>
+
+    <div class="callout">
+        <div class="callout-label">A pod is one machine</div>
+        <p>Within a TPU pod, software treats the pod as a single coherent memory space &mdash; you can <code>jax.device_put(x, sharding=NamedSharding(mesh, ...))</code> and any chip can access any other chip's HBM. The compiler will turn that into ICI all-gather / all-reduce / reduce-scatter calls automatically. You don't write the cross-chip transfers explicitly &mdash; <strong>but you do feel them in your tile-size choices.</strong></p>
+    </div>
+</section>
+
+<section class="slide" id="slide-06">
+    <div class="slide-number">06</div>
+    <h2>INT8 &mdash; Where v1 Started</h2>
+    <p>v1's only numeric: 8-bit signed integers. Multipliers produced 16-bit products; accumulators were 32-bit. Inference only &mdash; no gradients, no FP arithmetic anywhere on chip.</p>
+
+    <h3>Why INT8 worked for inference in 2015</h3>
+    <ul>
+        <li>The dominant inference models (CNNs for images, narrow MLPs for ranking) tolerate post-training quantisation to INT8 with negligible accuracy loss.</li>
+        <li>INT8 multiplies are 16&times; cheaper in silicon area than FP32, and ~4&times; cheaper than FP16.</li>
+        <li>INT8 storage is 4&times; cheaper in HBM bandwidth than FP32.</li>
+    </ul>
+
+    <h3>Why INT8 didn't work for training</h3>
+    <ul>
+        <li>Gradients have a dynamic range of ~10<sup>5</sup> to 10<sup>10</sup>; INT8 covers maybe 10<sup>2</sup>.</li>
+        <li>Weight updates are typically 10<sup>-5</sup> &times; learning_rate &times; gradient. Quantising those updates to INT8 erases most of them.</li>
+        <li>Accumulating gradients across batches blows out the integer range immediately.</li>
+    </ul>
+
+    <p>v1's INT8-only choice is the cleanest possible "inference accelerator" decision. v2 is the moment Google admits that training also needs to live on this chip, which forces FP arithmetic.</p>
+</section>
+
+<section class="slide" id="slide-07">
+    <div class="slide-number">07</div>
+    <h2>bfloat16 &mdash; The Format That Won</h2>
+
+    <div class="diagram-grid cols-3">
+        <div class="diagram-panel accent-border">
+            <h4>FP32 (IEEE 754 single)</h4>
+            <div class="bits">
+                <span class="bit s">S</span>
+                <span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span>
+                <span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span>
+            </div>
+            <p>1 sign + 8 exp + 23 mantissa. Range ~10<sup>&plusmn;38</sup>. The standard since 1985.</p>
+        </div>
+        <div class="diagram-panel y">
+            <h4>FP16 (IEEE half)</h4>
+            <div class="bits">
+                <span class="bit s">S</span>
+                <span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span>
+                <span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span>
+            </div>
+            <p>1+5+10. Range ~10<sup>&plusmn;5</sup>. Underflows on small gradients.</p>
+        </div>
+        <div class="diagram-panel g">
+            <h4>bfloat16 (Google Brain)</h4>
+            <div class="bits">
+                <span class="bit s">S</span>
+                <span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span>
+                <span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span>
+            </div>
+            <p>1+8+7. Same range as FP32 (~10<sup>&plusmn;38</sup>). Conversion to/from FP32 is just truncation.</p>
+        </div>
+    </div>
+
+    <h3>Why bfloat16 is the format of the modern AI era</h3>
+    <ul>
+        <li><strong>Range, not precision, is the binding constraint.</strong> Neural-net training is numerically robust to small rounding errors, but extremely sensitive to over/underflow.</li>
+        <li><strong>Drop-in compatibility.</strong> A bf16 value is the top half of an FP32 value &mdash; you can convert by truncation, no scaling needed.</li>
+        <li><strong>Hardware multipliers shrink.</strong> A bf16 multiplier is ~25% the area of an FP32 multiplier; an FP16 multiplier is ~30% (extra mantissa bits).</li>
+        <li><strong>Memory and bandwidth halve</strong> compared to FP32.</li>
+    </ul>
+
+    <p>bf16 first appeared in TPU v2 in 2017. NVIDIA added it to Ampere tensor cores in 2020. Intel shipped AVX-512 BF16 instructions in Cooper Lake (also 2020). ARM's BFloat16 extension landed in ARMv8.6. By 2026 every major AI accelerator and CPU supports it natively. <strong>It is the most successful Google-originated numeric format in computing history.</strong></p>
+</section>
+
+<section class="slide" id="slide-08">
+    <div class="slide-number">08</div>
+    <h2>FP8 &mdash; OCP E4M3 / E5M2</h2>
+    <p>FP8 is the third generation of "halve precision, double FLOPS" on TPUs. Native on Ironwood; supported but less prominent on v5p. The format is the OCP (Open Compute Project) standard, jointly defined by NVIDIA, Intel, ARM, AMD, and Google.</p>
+
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>E4M3 &mdash; activations / weights</h4>
+            <div class="bits">
+                <span class="bit s">S</span>
+                <span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span>
+                <span class="bit m">M</span><span class="bit m">M</span><span class="bit m">M</span>
+            </div>
+            <ul>
+                <li>1 sign + 4 exp + 3 mantissa.</li>
+                <li>Range ~10<sup>&plusmn;1.5</sup> (after the special-value asymmetry).</li>
+                <li>Better precision; used for forward-pass tensors.</li>
+            </ul>
+        </div>
+        <div class="diagram-panel y">
+            <h4>E5M2 &mdash; gradients</h4>
+            <div class="bits">
+                <span class="bit s">S</span>
+                <span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span><span class="bit e">E</span>
+                <span class="bit m">M</span><span class="bit m">M</span>
+            </div>
+            <ul>
+                <li>1 sign + 5 exp + 2 mantissa.</li>
+                <li>Range ~10<sup>&plusmn;5</sup>.</li>
+                <li>Wider range; used for gradients in mixed-precision training (rarer use on TPU since training stays in bf16).</li>
+            </ul>
+        </div>
+    </div>
+
+    <h3>Per-block scaling</h3>
+    <p>FP8's narrow range alone is too tight for most tensors. The standard practice is <strong>block scaling</strong>: a block of values (typically 32 or 128 elements) shares an FP32 scale factor. The math is FP8 &times; (1 / scale); the scale is recomputed per block. This is the same pattern NVIDIA uses with MXFP8 / NVFP8, and the same family Blackwell uses for its FP4 (MXFP4) format.</p>
+
+    <h3>Why TPUs went for FP8 specifically (not int8 doubled)</h3>
+    <ul>
+        <li>FP8 with block scaling matches per-tensor INT8 + scale on accuracy, with floating-point semantics that compose better through nonlinear ops.</li>
+        <li>The MXU silicon for FP8 multiplies is similar in area to INT8 multiplies, so peak FLOPS doubles vs bf16 in the same area.</li>
+        <li>Software ecosystem &mdash; NVIDIA's adoption of the same OCP formats means models converge across hardware vendors.</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-09">
+    <div class="slide-number">09</div>
+    <h2>Accumulator Widths &amp; Numerical Stability</h2>
+    <p>An MXU multiplies two narrow-format operands and accumulates into a wider format. Accumulator width is the chip's secret weapon for numerical stability.</p>
+
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Generation</th><th>Multiply</th><th>Accumulate</th><th>Output</th></tr></thead>
+            <tbody>
+                <tr><td>v1</td><td>INT8 &times; INT8</td><td>INT32</td><td>INT8 (re-quantised)</td></tr>
+                <tr><td>v2 / v3 / v4 / v5</td><td>bf16 &times; bf16</td><td>FP32</td><td>bf16 (or FP32 if requested)</td></tr>
+                <tr><td>v5p / v5e (INT8 path)</td><td>INT8 &times; INT8</td><td>INT32</td><td>bf16 / INT8</td></tr>
+                <tr><td>Ironwood (FP8 path)</td><td>FP8 &times; FP8 (with per-block scale)</td><td>FP32</td><td>bf16 / FP8</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Why FP32 accumulate matters</h3>
+    <p>A 256-deep matmul with bf16 inputs has 256 partial-product additions stacking up. If you accumulate in bf16 (7-bit mantissa), the running sum loses ~7 bits of precision per addition; long contractions are essentially zero by the end. FP32 (23-bit mantissa) gives you ~16 extra bits of headroom &mdash; enough that the same matmul produces a result indistinguishable from FP32-throughout.</p>
+
+    <p>This is why "bf16 matmul" on a TPU is in fact "bf16 multiply, FP32 accumulate". The advertised throughput is the multiply rate; the accumulator silicon is more expensive and is sized to keep the array stable.</p>
+
+    <div class="callout">
+        <div class="callout-label">A trade no one talks about</div>
+        <p>FP8 with FP32 accumulate is the same engineering choice. NVIDIA does this; AMD does this; Google does this. The reason FP8 / bf16 / INT8 advertised TFLOPS are <em>2&times; / 4&times; / 4&times;</em> the FP32 TFLOPS is partly because the accumulator stays at FP32 width &mdash; you save area on the multiplier, not the adder. This is also why advertised FP4 numbers are even more advertising-flavoured than usual: the accumulator hasn't shrunk.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-10">
+    <div class="slide-number">10</div>
+    <h2>The "Halve Precision, Double FLOPS" Pattern</h2>
+    <p>Every TPU generation has used this lever at least once. The pattern:</p>
+
+    <div class="canvas-wrap">
+        <svg viewBox="0 0 700 200" width="700" height="200" xmlns="http://www.w3.org/2000/svg">
+            <style>
+                .blk { fill:#161b22; stroke:#21262d; }
+                .blk.acc { fill:rgba(66,133,244,0.20); stroke:#4285F4; stroke-width:2; }
+                .arr { stroke:#4285F4; stroke-width:1.5; fill:none; marker-end:url(#m9); }
+                .lbl { fill:#e6edf3; font-family:'Space Grotesk',sans-serif; font-size:13px; text-anchor:middle; }
+                .sublbl { fill:#8b949e; font-family:'JetBrains Mono',monospace; font-size:10px; text-anchor:middle; }
+            </style>
+            <defs><marker id="m9" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#4285F4"/></marker></defs>
+            <rect class="blk" x="20" y="60" width="100" height="50" rx="6"/><text class="lbl" x="70" y="80">FP32</text><text class="sublbl" x="70" y="98">v1 era CPU</text>
+            <line class="arr" x1="125" y1="85" x2="155" y2="85"/>
+            <rect class="blk acc" x="160" y="60" width="100" height="50" rx="6"/><text class="lbl" x="210" y="80">bf16</text><text class="sublbl" x="210" y="98">v2 — 2&times;</text>
+            <line class="arr" x1="265" y1="85" x2="295" y2="85"/>
+            <rect class="blk acc" x="300" y="60" width="100" height="50" rx="6"/><text class="lbl" x="350" y="80">INT8</text><text class="sublbl" x="350" y="98">v5e — 2&times;</text>
+            <line class="arr" x1="405" y1="85" x2="435" y2="85"/>
+            <rect class="blk acc" x="440" y="60" width="100" height="50" rx="6"/><text class="lbl" x="490" y="80">FP8</text><text class="sublbl" x="490" y="98">Ironwood — 2&times;</text>
+            <line class="arr" x1="545" y1="85" x2="575" y2="85"/>
+            <rect class="blk" x="580" y="60" width="100" height="50" rx="6" stroke-dasharray="3 3"/><text class="lbl" x="630" y="80">FP4?</text><text class="sublbl" x="630" y="98">future — 2&times;</text>
+            <text class="sublbl" x="350" y="160">each step doubles peak ops/cycle on the same MAC area</text>
+        </svg>
+    </div>
+
+    <ul>
+        <li><strong>FP32 &rarr; bf16</strong> (2017, v2): 2&times; on multiplier area, 2&times; on memory and bandwidth.</li>
+        <li><strong>bf16 &rarr; INT8</strong> (v1 had it; v5e revives it): 2&times; on multiplier area, 2&times; on memory and bandwidth.</li>
+        <li><strong>bf16 &rarr; FP8</strong> (Ironwood, 2025): 2&times; on multiplier area, 2&times; on memory and bandwidth.</li>
+    </ul>
+
+    <p>This is the post-Dennard-scaling answer. You can't double FLOPS by doubling transistors any more &mdash; transistors are too expensive and dies are reticle-limited. You double FLOPS by halving the format. Each step costs you accuracy; the price has been worth paying so far.</p>
+</section>
+
+<section class="slide" id="slide-11">
+    <div class="slide-number">11</div>
+    <h2>Why TPUs Have No FP4 (Yet)</h2>
+    <p>NVIDIA's Blackwell (B200) added FP4 (MXFP4) in 2024, claiming 2&times; FP8 throughput on inference. Ironwood (2025) does <em>not</em> ship FP4. Why?</p>
+
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel y">
+            <h4>The skeptical view</h4>
+            <ul>
+                <li>FP4 is so narrow (3 bits of magnitude) that almost any model needs aggressive per-block scaling and PTQ-style calibration.</li>
+                <li>Quality regressions on long-context generation have been observed.</li>
+                <li>Ironwood's HBM3e capacity (192 GiB) is large enough that most inference workloads don't need FP4 to fit in chip-memory.</li>
+                <li>FP8 + bigger HBM may be a better point on the quality / throughput curve than FP4 + tight HBM.</li>
+            </ul>
+        </div>
+        <div class="diagram-panel g">
+            <h4>The likely-future view</h4>
+            <ul>
+                <li>NVIDIA's MXFP4 is the OCP-blessed format; if it becomes the inference standard, TPUs will follow.</li>
+                <li>Future Trillium-successor or Ironwood-successor will plausibly ship FP4 native; the design lever is just too obvious to skip permanently.</li>
+                <li>NVFP4 (NVIDIA's variant with 16-element blocks and a two-level FP8/FP32 scale) gives most of FP4's bandwidth advantage with fewer accuracy regressions; OCP MXFP4 (32-element blocks, E8M0 scale) is the more conservative version.</li>
+            </ul>
+        </div>
+    </div>
+
+    <p>The TPU programme has historically been conservative on numerics &mdash; bf16 was years ahead of FP16 in adoption, but FP8 and FP4 have lagged NVIDIA by one generation each. That's a deliberate Jouppi-era trade: ship known-good silicon, let the format mature in the wild, then add it.</p>
+</section>
+
+<section class="slide" id="slide-12">
+    <div class="slide-number">12</div>
+    <h2>Cheat Sheet</h2>
+    <ul>
+        <li><strong>Six-tier hierarchy:</strong> PE registers &rarr; accumulator SRAM &rarr; VMEM (per-TC scratchpad) &rarr; CMEM (shared on-die cache) &rarr; HBM &rarr; remote HBM via ICI. The two important boundaries are VMEM&harr;HBM and HBM&harr;remote.</li>
+        <li><strong>VMEM:</strong> ~32&ndash;64 MiB per TensorCore, software-managed, no tags. Direct ancestor of v1's Unified Buffer.</li>
+        <li><strong>CMEM:</strong> introduced v4i (2021). ~128 MiB shared, cache-like. Effective HBM bandwidth amplifier.</li>
+        <li><strong>HBM growth</strong> from v1's 34 GB/s DDR3 to Ironwood's 7.37 TB/s HBM3e &mdash; 217&times; in 10 years, the dominant per-chip uplift.</li>
+        <li><strong>INT8 (v1):</strong> the inference-only choice, with INT32 accumulators.</li>
+        <li><strong>bfloat16 (v2 onwards):</strong> Google Brain's invention. FP32 exponent + 7-bit mantissa. FP32 accumulate. Now industry standard.</li>
+        <li><strong>FP8 (Ironwood, 2025):</strong> OCP E4M3/E5M2 with per-block scaling. FP32 accumulate. Doubles peak vs bf16.</li>
+        <li><strong>Accumulator width</strong> stays FP32 across all generations &mdash; that's why narrow-format FLOPS scale with the multiplier, not the adder.</li>
+        <li><strong>FP4</strong> not yet on TPU; will likely arrive in a future generation when the format stabilises.</li>
+    </ul>
+
+    <div class="callout">
+        <div class="callout-label">Read next</div>
+        <p>Deck <strong>10 &mdash; ICI &amp; OCS</strong> covers the cross-chip side of the hierarchy &mdash; how remote HBM actually gets to your local matmul.</p>
+    </div>
+</section>
+
+<footer class="footer">
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Google_TPUs">Google TPUs</a> series. Sources: ISCA 2017 / 2021 / 2023 TPU papers; Google Cloud TPU docs (v3/v4/v5e/v5p/v6e/tpu7x); Google Cloud "bfloat16: the secret to high performance on Cloud TPUs" blog; OCP MX specifications for FP8 and FP4.</p>
+</footer>
+
+</body>
+</html>

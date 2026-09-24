@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root { --bg-primary:#0a0a0a; --bg-card:#0d1117; --bg-code:#161b22; --text-primary:#e6edf3; --text-secondary:#8b949e; --accent:#4285F4; --accent-dim:#4285F444; --accent-glow:#4285F433; --accent-2:#EA4335; --accent-3:#FBBC04; --accent-4:#34A853; --border:#21262d; --font-display:'Space Grotesk',sans-serif; --font-mono:'JetBrains Mono','Fira Code',monospace; --font-body:'Inter',sans-serif; --max-width:900px; }
+        :root { --bg-primary:#f3efe6; --bg-card:#ebe6da; --bg-code:#e2dcce; --text-primary:#1b1a18; --text-secondary:#625c52; --accent:#355ec6; --accent-dim:#355ec644; --accent-glow:#355ec61a; --accent-2:#ee3218; --accent-3:#8b6a0d; --accent-4:#458f5d; --border:#d0c9b8; --font-display:'Space Grotesk',sans-serif; --font-mono:'JetBrains Mono','Fira Code',monospace; --font-body:'Inter',sans-serif; --max-width:900px; }
         *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
         html { scroll-behavior:smooth; }
         body { background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-body); font-size:17px; line-height:1.7; overflow-x:hidden; }
@@ -38,7 +38,7 @@
         th { background:var(--bg-code); color:var(--accent); font-weight:600; text-align:left; padding:0.75rem 1rem; border-bottom:1px solid var(--border); font-family:var(--font-display); white-space:nowrap; }
         td { padding:0.6rem 1rem; border-bottom:1px solid var(--border); color:var(--text-secondary); vertical-align:top; }
         tr:last-child td { border-bottom:none; }
-        tr:nth-child(even) td { background:rgba(13,17,23,0.5); }
+        tr:nth-child(even) td { background:rgba(235,230,218,0.5); }
         .diagram-grid { display:grid; gap:0.75rem; margin:1.5rem 0; padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; }
         .diagram-grid.cols-2 { grid-template-columns:1fr 1fr; }
         .diagram-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
@@ -60,13 +60,13 @@
         .tier-visual { display:flex; flex-direction:column; gap:0.5rem; margin:1.5rem 0; padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; }
         .tier-bar { display:flex; align-items:center; gap:0.75rem; }
         .tier-label { font-family:var(--font-mono); font-size:0.75rem; color:var(--text-secondary); min-width:90px; text-align:right; }
-        .tier-fill { height:32px; border-radius:4px; display:flex; align-items:center; padding:0 0.75rem; font-family:var(--font-mono); font-size:0.7rem; white-space:nowrap; color:#0a0a0a; font-weight:600; }
+        .tier-fill { height:32px; border-radius:4px; display:flex; align-items:center; padding:0 0.75rem; font-family:var(--font-mono); font-size:0.7rem; white-space:nowrap; color:#f3efe6; font-weight:600; }
         .tier-cost { font-family:var(--font-mono); font-size:0.7rem; color:var(--text-secondary); min-width:80px; }
         .bits { display:flex; gap:1px; margin:0.5rem 0; }
         .bit { font-family:var(--font-mono); font-size:0.65rem; padding:0.2rem 0; min-width:18px; text-align:center; border-radius:2px; }
-        .bit.s { background:#EA4335; color:#fff; }
-        .bit.e { background:#FBBC04; color:#000; }
-        .bit.m { background:#4285F4; color:#fff; }
+        .bit.s { background:#ee3218; color:#0b0b0a; }
+        .bit.e { background:#8b6a0d; color:#fdfbf6; }
+        .bit.m { background:#355ec6; color:#0b0b0a; }
         .contents-list { list-style:none; padding-left:0; counter-reset:contents; }
         .contents-list li { counter-increment:contents; padding:0.6rem 0; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:1rem; }
         .contents-list li:last-child { border-bottom:none; }
@@ -124,12 +124,12 @@
     <p>From smallest and fastest to largest and slowest. Numbers are roughly Ironwood-class.</p>
 
     <div class="tier-visual">
-        <div class="tier-bar"><span class="tier-label">PE regs</span><div class="tier-fill" style="width:18%; background:#EA4335;">Per-PE registers (KiBs)</div><span class="tier-cost">~1 cycle</span></div>
-        <div class="tier-bar"><span class="tier-label">Accum</span><div class="tier-fill" style="width:25%; background:#FBBC04;">Accumulator SRAM (~MB)</div><span class="tier-cost">1&ndash;2 cycles</span></div>
-        <div class="tier-bar"><span class="tier-label">VMEM</span><div class="tier-fill" style="width:38%; background:#34A853;">VMEM scratchpad (16&ndash;64 MiB per TC)</div><span class="tier-cost">~5 cycles</span></div>
-        <div class="tier-bar"><span class="tier-label">CMEM</span><div class="tier-fill" style="width:50%; background:#4285F4;">CMEM cache (128 MiB+ shared)</div><span class="tier-cost">~20 cycles</span></div>
-        <div class="tier-bar"><span class="tier-label">HBM</span><div class="tier-fill" style="width:75%; background:#8b949e; color:#0a0a0a;">HBM3e — 192 GiB at 7.37 TB/s</div><span class="tier-cost">~250 ns</span></div>
-        <div class="tier-bar"><span class="tier-label">Remote</span><div class="tier-fill" style="width:100%; background:#21262d; color:#e6edf3;">Remote HBM via ICI (1.2 TB/s bidir)</div><span class="tier-cost">~2 &mu;s + tx</span></div>
+        <div class="tier-bar"><span class="tier-label">PE regs</span><div class="tier-fill" style="width:18%; background:#ee3218;">Per-PE registers (KiBs)</div><span class="tier-cost">~1 cycle</span></div>
+        <div class="tier-bar"><span class="tier-label">Accum</span><div class="tier-fill" style="width:25%; background:#8b6a0d;">Accumulator SRAM (~MB)</div><span class="tier-cost">1&ndash;2 cycles</span></div>
+        <div class="tier-bar"><span class="tier-label">VMEM</span><div class="tier-fill" style="width:38%; background:#458f5d;">VMEM scratchpad (16&ndash;64 MiB per TC)</div><span class="tier-cost">~5 cycles</span></div>
+        <div class="tier-bar"><span class="tier-label">CMEM</span><div class="tier-fill" style="width:50%; background:#355ec6;">CMEM cache (128 MiB+ shared)</div><span class="tier-cost">~20 cycles</span></div>
+        <div class="tier-bar"><span class="tier-label">HBM</span><div class="tier-fill" style="width:75%; background:#625c52; color:#f3efe6;">HBM3e — 192 GiB at 7.37 TB/s</div><span class="tier-cost">~250 ns</span></div>
+        <div class="tier-bar"><span class="tier-label">Remote</span><div class="tier-fill" style="width:100%; background:#d0c9b8; color:#1b1a18;">Remote HBM via ICI (1.2 TB/s bidir)</div><span class="tier-cost">~2 &mu;s + tx</span></div>
     </div>
 
     <h3>The two boundaries that matter most</h3>
@@ -436,13 +436,13 @@
     <div class="canvas-wrap">
         <svg viewBox="0 0 700 200" width="700" height="200" xmlns="http://www.w3.org/2000/svg">
             <style>
-                .blk { fill:#161b22; stroke:#21262d; }
-                .blk.acc { fill:rgba(66,133,244,0.20); stroke:#4285F4; stroke-width:2; }
-                .arr { stroke:#4285F4; stroke-width:1.5; fill:none; marker-end:url(#m9); }
-                .lbl { fill:#e6edf3; font-family:'Space Grotesk',sans-serif; font-size:13px; text-anchor:middle; }
-                .sublbl { fill:#8b949e; font-family:'JetBrains Mono',monospace; font-size:10px; text-anchor:middle; }
+                .blk { fill:#e2dcce; stroke:#d0c9b8; }
+                .blk.acc { fill:rgba(53,94,198,0.20); stroke:#355ec6; stroke-width:2; }
+                .arr { stroke:#355ec6; stroke-width:1.5; fill:none; marker-end:url(#m9); }
+                .lbl { fill:#1b1a18; font-family:'Space Grotesk',sans-serif; font-size:13px; text-anchor:middle; }
+                .sublbl { fill:#625c52; font-family:'JetBrains Mono',monospace; font-size:10px; text-anchor:middle; }
             </style>
-            <defs><marker id="m9" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#4285F4"/></marker></defs>
+            <defs><marker id="m9" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#355ec6"/></marker></defs>
             <rect class="blk" x="20" y="60" width="100" height="50" rx="6"/><text class="lbl" x="70" y="80">FP32</text><text class="sublbl" x="70" y="98">v1 era CPU</text>
             <line class="arr" x1="125" y1="85" x2="155" y2="85"/>
             <rect class="blk acc" x="160" y="60" width="100" height="50" rx="6"/><text class="lbl" x="210" y="80">bf16</text><text class="sublbl" x="210" y="98">v2 — 2&times;</text>

@@ -168,9 +168,9 @@
 
     <h3>Capacities by generation</h3>
     <ul>
-        <li>v2: 32 MiB per TensorCore.</li>
-        <li>v3: 32 MiB per TensorCore.</li>
-        <li>v4: ~32 MiB per TensorCore.</li>
+        <li>v2: 32 MiB per chip (~16 MiB per TensorCore).</li>
+        <li>v3: 32 MiB per chip (~16 MiB per TensorCore).</li>
+        <li>v4: 32 MiB per chip (~16 MiB per TensorCore).</li>
         <li>v5p: ~64 MiB per TensorCore (estimated; not officially confirmed).</li>
         <li>Trillium / Ironwood: similar order of magnitude, with bigger CMEM in front.</li>
     </ul>
@@ -498,7 +498,7 @@
     <h2>Cheat Sheet</h2>
     <ul>
         <li><strong>Six-tier hierarchy:</strong> PE registers &rarr; accumulator SRAM &rarr; VMEM (per-TC scratchpad) &rarr; CMEM (shared on-die cache) &rarr; HBM &rarr; remote HBM via ICI. The two important boundaries are VMEM&harr;HBM and HBM&harr;remote.</li>
-        <li><strong>VMEM:</strong> ~32&ndash;64 MiB per TensorCore, software-managed, no tags. Direct ancestor of v1's Unified Buffer.</li>
+        <li><strong>VMEM:</strong> ~16 MiB per TensorCore on v2&ndash;v4 (32 MiB per chip; later chips undisclosed), software-managed, no tags. Direct ancestor of v1's Unified Buffer.</li>
         <li><strong>CMEM:</strong> introduced v4i (2021). ~128 MiB shared, cache-like. Effective HBM bandwidth amplifier.</li>
         <li><strong>HBM growth</strong> from v1's 34 GB/s DDR3 to Ironwood's 7.37 TB/s HBM3e &mdash; 217&times; in 10 years, the dominant per-chip uplift.</li>
         <li><strong>INT8 (v1):</strong> the inference-only choice, with INT32 accumulators.</li>
